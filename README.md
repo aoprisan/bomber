@@ -11,6 +11,12 @@ Vite, and a hand-rolled service worker. Deploys to GitHub Pages.
 
 ## Status
 
+Feature-complete — all six milestones landed. A one-input, portrait,
+Archero-style night bombing raid: steer through flak, tracers, searchlights,
+night fighters, and barrage balloons; auto-bomb factories / rail yards / depots
+for combo score; pick roguelite upgrades between segments. Procedural audio,
+particles, and screen shake throughout.
+
 Milestones:
 
 1. ✅ Scaffold + moving bomber with drag input
@@ -18,7 +24,7 @@ Milestones:
 3. ✅ Targets + bombsight auto-bombing + combo scoring
 4. ✅ Tracers, searchlights + night fighters, barrage balloons
 5. ✅ Upgrade system + roguelite segments
-6. Audio, particles, polish, difficulty curve
+6. ✅ Procedural audio, particles, screen shake, difficulty curve
 
 ## Develop
 

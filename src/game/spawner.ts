@@ -1,5 +1,5 @@
 import { clamp } from "./entities";
-import { BALLOON, FLAK, SPAWN, TARGET, TRACER, WORLD } from "./tuning";
+import { BALLOON, DIFFICULTY, FLAK, SPAWN, TARGET, TRACER, WORLD } from "./tuning";
 
 const DEG = Math.PI / 180;
 
@@ -88,25 +88,34 @@ export class Spawner {
         this.elapsedMs + SPAWN.targetGapMs + Math.random() * SPAWN.targetGapJitterMs;
     }
 
+    const scale = this.gapScale();
+
     if (this.elapsedMs >= this.nextTracerMs) {
       batch.tracers.push(this.randomTracer());
       this.nextTracerMs =
-        this.elapsedMs + SPAWN.tracerGapMs + Math.random() * SPAWN.tracerGapJitterMs;
+        this.elapsedMs + (SPAWN.tracerGapMs + Math.random() * SPAWN.tracerGapJitterMs) * scale;
     }
 
     if (this.elapsedMs >= this.nextBalloonMs) {
       batch.balloons.push(this.randomBalloon());
       this.nextBalloonMs =
-        this.elapsedMs + SPAWN.balloonGapMs + Math.random() * SPAWN.balloonGapJitterMs;
+        this.elapsedMs + (SPAWN.balloonGapMs + Math.random() * SPAWN.balloonGapJitterMs) * scale;
     }
 
     if (this.elapsedMs >= this.nextSearchlightMs) {
       batch.searchlights.push(this.randomSearchlight());
       this.nextSearchlightMs =
-        this.elapsedMs + SPAWN.searchlightGapMs + Math.random() * SPAWN.searchlightGapJitterMs;
+        this.elapsedMs +
+        (SPAWN.searchlightGapMs + Math.random() * SPAWN.searchlightGapJitterMs) * scale;
     }
 
     return batch;
+  }
+
+  /** Difficulty curve: threat gaps shrink toward minGapScale over the raid. */
+  private gapScale(): number {
+    const t = clamp(this.elapsedMs / DIFFICULTY.rampMs, 0, 1);
+    return 1 + (DIFFICULTY.minGapScale - 1) * t;
   }
 
   private randomTracer(): TracerRequest {

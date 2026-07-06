@@ -361,3 +361,50 @@ export const UPGRADES = {
   tanks: { hpPerLevelPerSegment: 1 },
 } as const;
 
+
+// ---------------------------------------------------------------------------
+// M6 — audio, particles, screen shake, difficulty curve
+// ---------------------------------------------------------------------------
+
+/** Per-effect gains for the procedural SFX (master gain lives in AudioEngine). */
+export const AUDIO = {
+  flakGain: 0.24,
+  whistleGain: 0.11,
+  boomGain: 0.4,
+  hitGain: 0.34,
+  uiGain: 0.18,
+  shotGain: 0.05,
+  engineGain: 0.045,
+} as const;
+
+/** Pooled particle system (sparks, debris, exhaust). */
+export const PARTICLE = {
+  max: 300,
+  /** Downward acceleration (world units / s^2). */
+  gravity: 240,
+  /** Air drag per second (velocity multiplier). */
+  drag: 1.6,
+  /** Bomber engine exhaust: emit every N ms while flying. */
+  exhaustEveryMs: 34,
+} as const;
+
+/** Screen shake magnitudes (world units) and how fast shake decays. */
+export const SHAKE = {
+  hit: 8,
+  bomb: 3,
+  fighterKill: 3.5,
+  /** Shake magnitude decays toward 0 at this rate per second. */
+  decayPerSec: 34,
+  max: 10,
+} as const;
+
+/**
+ * Global difficulty curve. Beyond flak's own ramp, this scales the gaps of the
+ * later threats down over the course of a long raid so intensity keeps rising.
+ */
+export const DIFFICULTY = {
+  /** Play time to reach full intensity (ms). */
+  rampMs: 150_000,
+  /** Threat gaps shrink toward this fraction of their base by full intensity. */
+  minGapScale: 0.55,
+} as const;

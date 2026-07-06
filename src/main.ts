@@ -1,6 +1,7 @@
 import { AudioEngine } from "./engine/audio";
 import { PointerInput } from "./engine/input";
 import { GameLoop } from "./engine/loop";
+import { Sfx } from "./engine/sfx";
 import { Game } from "./game/game";
 import { Renderer } from "./game/render";
 import { GameOverScreen } from "./ui/gameover";
@@ -16,7 +17,22 @@ function boot(): void {
   // Steer from the canvas so DOM overlay controls (buttons) stay clickable.
   const input = new PointerInput(canvas);
   const audio = new AudioEngine();
-  input.onFirstGesture = () => audio.unlock();
+  const sfx = new Sfx(audio);
+  input.onFirstGesture = () => {
+    audio.unlock();
+    sfx.startEngine();
+  };
+
+  // Red vignette that flashes on damage.
+  const vignette = document.createElement("div");
+  vignette.className = "hit-vignette";
+  ui.appendChild(vignette);
+  let vignetteTimer = 0;
+  const flashDamage = (): void => {
+    vignette.classList.add("show");
+    window.clearTimeout(vignetteTimer);
+    vignetteTimer = window.setTimeout(() => vignette.classList.remove("show"), 180);
+  };
 
   const hud = new Hud(ui);
   const gameOver = new GameOverScreen(ui, () => {
@@ -28,9 +44,10 @@ function boot(): void {
     game.chooseUpgrade(key);
   });
 
-  const game = new Game(input, renderer, {
+  const game = new Game(input, renderer, sfx, {
     onGameOver: (stats) => gameOver.show(stats),
     onUpgrade: (choices, segment) => upgrades.show(choices, segment, game.mods),
+    onDamage: () => flashDamage(),
   });
 
   const loop = new GameLoop({
@@ -43,7 +60,8 @@ function boot(): void {
 
   // Dev-only handle for automated verification; tree-shaken from prod builds.
   if (import.meta.env.DEV) {
-    (window as unknown as { __game: Game }).__game = game;
+    (window as unknown as { __game: Game; __audio: AudioEngine }).__game = game;
+    (window as unknown as { __game: Game; __audio: AudioEngine }).__audio = audio;
   }
 
   document.addEventListener("visibilitychange", () => {

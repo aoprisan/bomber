@@ -1,6 +1,8 @@
 import { PointerInput } from "../engine/input";
 import { Pool } from "../engine/pool";
+import { Sfx } from "../engine/sfx";
 import { Bullet } from "./bullets";
+import { Particle } from "./particles";
 import { Explosion, ScorePopup } from "./effects";
 import { Bomber, clamp } from "./entities";
 import { Renderer, Scene } from "./render";
@@ -18,8 +20,10 @@ import {
   FIGHTER,
   FLAK,
   INPUT,
+  PARTICLE,
   SCORING,
   SCROLL,
+  SHAKE,
   SPAWN,
   TRACER,
   UPGRADES,
@@ -50,6 +54,8 @@ export interface GameCallbacks {
   onGameOver(stats: RunStats): void;
   /** A segment cleared; offer one of these upgrades (segment is 1-based). */
   onUpgrade(choices: readonly UpgradeDef[], segment: number): void;
+  /** The bomber took damage (for the hit vignette). */
+  onDamage(): void;
 }
 
 /**
@@ -92,6 +98,11 @@ export class Game {
     () => new Bullet(),
     () => {},
   );
+  private readonly particles = new Pool<Particle>(
+    PARTICLE.max,
+    () => new Particle(),
+    () => {},
+  );
   private readonly explosions = new Pool<Explosion>(
     EXPLOSION.maxExplosions,
     () => new Explosion(),
@@ -106,10 +117,14 @@ export class Game {
 
   private nudge = 0;
   private inputConsumedThisFrame = false;
+  private exhaustTimer = 0;
+  /** Current screen-shake magnitude (world units), decays over time. */
+  private shakeMag = 0;
 
   constructor(
     private readonly input: PointerInput,
     private readonly renderer: Renderer,
+    private readonly sfx: Sfx,
     private readonly cb: GameCallbacks,
   ) {}
 
@@ -127,9 +142,12 @@ export class Game {
     this.searchlights.clear();
     this.fighters.clear();
     this.bullets.clear();
+    this.particles.clear();
     this.explosions.clear();
     this.popups.clear();
     this.spawner.reset();
+    this.exhaustTimer = 0;
+    this.shakeMag = 0;
     this.scrollY = 0;
     this.elapsedMs = 0;
     this.hitsTaken = 0;
@@ -153,6 +171,7 @@ export class Game {
       this.mods.levels[key]++;
       upgradeByKey(key).apply(this.bomber, this.mods);
     }
+    this.sfx.upgrade();
     this.nextSegmentMs += UPGRADES.segmentMs;
     this.phase = "playing";
     this.input.poll();
@@ -222,8 +241,19 @@ export class Game {
 
     const { x: bx, y: by, radius: br } = this.bomber;
 
+    // Engine exhaust trail behind the bomber.
+    this.exhaustTimer -= dtMs;
+    while (this.exhaustTimer <= 0) {
+      this.exhaustTimer += PARTICLE.exhaustEveryMs;
+      this.emit(bx + (Math.random() - 0.5) * 6, by + this.bomber.radius, (Math.random() - 0.5) * 20, 60 + Math.random() * 40, 260, 2.2, [120, 170, 255], 0);
+    }
+
     this.flak.forEach((f) => {
       f.update(dtMs);
+      if (f.consumeBlastStarted()) {
+        this.sfx.flakThump();
+        this.emitBurst(f.x, f.y, 10, 150, 420, [255, 150, 60]);
+      }
       if (f.dead) return true;
       this.collideFlak(f);
       return false;
@@ -255,6 +285,7 @@ export class Game {
       if (s.takeFighterRequest()) {
         const ft = this.fighters.spawn();
         if (ft) ft.spawn(bx); // strafe the lane where we were caught
+        this.sfx.lock();
       }
       return s.dead;
     });
@@ -296,6 +327,7 @@ export class Game {
 
     const b = this.bullets.spawn();
     if (b) b.spawn(bx, by - this.bomber.radius, target.x, target.y);
+    this.sfx.shot();
     const t = UPGRADES.tailgun;
     this.tailgunTimer = Math.max(
       t.minIntervalMs,
@@ -331,6 +363,9 @@ export class Game {
         if (ft.damage(UPGRADES.tailgun.damage)) {
           const e = this.explosions.spawn();
           if (e) e.spawn(ft.x, ft.y, b.x, b.y);
+          this.sfx.flakThump();
+          this.emitBurst(ft.x, ft.y, 12, 170, 480, [200, 220, 255]);
+          this.addShake(SHAKE.fighterKill);
         }
         return true;
       }
@@ -339,6 +374,12 @@ export class Game {
   }
 
   private stepEffects(dtMs: number): void {
+    const dt = dtMs / 1000;
+    this.shakeMag = Math.max(0, this.shakeMag - SHAKE.decayPerSec * dt);
+    this.particles.forEach((p) => {
+      p.update(dt);
+      return p.dead;
+    });
     this.explosions.forEach((e) => {
       e.update(dtMs);
       return e.dead;
@@ -395,6 +436,9 @@ export class Game {
     const e = this.explosions.spawn();
     if (e) e.spawn(t.x, t.y, this.bomber.x, this.bomber.y);
     this.spawnPopup(t.x, t.y, mult > 1 ? `+${points} x${mult}` : `+${points}`);
+    this.sfx.bombDrop();
+    this.emitBurst(t.x, t.y, 14, 190, 520, [255, 190, 90]);
+    this.addShake(SHAKE.bomb);
   }
 
   private spawnPopup(x: number, y: number, text: string): void {
@@ -416,8 +460,48 @@ export class Game {
     if (!this.bomber.takeDamage(dmg)) return false;
     this.hitsTaken++;
     this.comboHits = 0; // taking damage breaks the combo
+    this.sfx.hit();
+    this.emitBurst(this.bomber.x, this.bomber.y, 16, 220, 460, [255, 90, 70]);
+    this.addShake(SHAKE.hit);
+    this.cb.onDamage();
     if (this.bomber.hp <= 0) this.endRun();
     return true;
+  }
+
+  // ---- Particles + screen shake ----------------------------------------
+
+  private emit(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    lifeMs: number,
+    size: number,
+    color: readonly [number, number, number],
+    gravityScale = 1,
+  ): void {
+    const p = this.particles.spawn();
+    if (p) p.spawn(x, y, vx, vy, lifeMs, size, color, gravityScale);
+  }
+
+  /** Radial spray of `count` particles from (x,y). */
+  private emitBurst(
+    x: number,
+    y: number,
+    count: number,
+    speed: number,
+    lifeMs: number,
+    color: readonly [number, number, number],
+  ): void {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = speed * (0.3 + Math.random() * 0.7);
+      this.emit(x, y, Math.cos(a) * s, Math.sin(a) * s, lifeMs * (0.6 + Math.random() * 0.4), 1.5 + Math.random() * 2, color, 0.6);
+    }
+  }
+
+  private addShake(mag: number): void {
+    this.shakeMag = Math.min(SHAKE.max, this.shakeMag + mag);
   }
 
   private endRun(): void {
@@ -449,12 +533,16 @@ export class Game {
       fighterCount: this.fighters.active,
       bullets: this.bullets.buffer,
       bulletCount: this.bullets.active,
+      particles: this.particles.buffer,
+      particleCount: this.particles.active,
       explosions: this.explosions.buffer,
       explosionCount: this.explosions.active,
       popups: this.popups.buffer,
       popupCount: this.popups.active,
       scrollY: this.scrollY,
       showReticle: this.phase === "playing",
+      shakeX: this.shakeMag ? (Math.random() * 2 - 1) * this.shakeMag : 0,
+      shakeY: this.shakeMag ? (Math.random() * 2 - 1) * this.shakeMag : 0,
     };
     this.renderer.draw(scene, alpha);
     this.inputConsumedThisFrame = false;

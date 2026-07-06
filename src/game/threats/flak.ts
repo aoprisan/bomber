@@ -15,6 +15,7 @@ export class Flak {
   age = 0;
   /** Set true once this burst has landed a hit, so it can't double-dip. */
   hasHit = false;
+  private blastAnnounced = false;
 
   /** Reinitialize for reuse from the pool at a new target point. */
   spawn(x: number, y: number): void {
@@ -22,6 +23,14 @@ export class Flak {
     this.y = y;
     this.age = 0;
     this.hasHit = false;
+    this.blastAnnounced = false;
+  }
+
+  /** True exactly once, on the frame the blast first goes off (for sfx/particles). */
+  consumeBlastStarted(): boolean {
+    if (this.blastAnnounced || this.age < FLAK.telegraphMs) return false;
+    this.blastAnnounced = true;
+    return true;
   }
 
   private get t0(): number {

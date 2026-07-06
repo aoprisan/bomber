@@ -1,6 +1,7 @@
 import { Bullet } from "./bullets";
 import { Explosion, ScorePopup } from "./effects";
 import { Bomber } from "./entities";
+import { Particle } from "./particles";
 import { Target } from "./targets";
 import { Balloon } from "./threats/balloon";
 import { Fighter } from "./threats/fighter";
@@ -29,12 +30,16 @@ export interface Scene {
   fighterCount: number;
   bullets: readonly Bullet[];
   bulletCount: number;
+  particles: readonly Particle[];
+  particleCount: number;
   explosions: readonly Explosion[];
   explosionCount: number;
   popups: readonly ScorePopup[];
   popupCount: number;
   scrollY: number;
   showReticle: boolean;
+  shakeX: number;
+  shakeY: number;
 }
 
 /**
@@ -47,6 +52,8 @@ export class Renderer {
   private scale = 1;
   private offsetX = 0;
   private offsetY = 0;
+  private shakeX = 0;
+  private shakeY = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d", { alpha: false });
@@ -86,14 +93,16 @@ export class Renderer {
       0,
       0,
       this.scale * dpr,
-      this.offsetX * dpr,
-      this.offsetY * dpr,
+      (this.offsetX + this.shakeX * this.scale) * dpr,
+      (this.offsetY + this.shakeY * this.scale) * dpr,
     );
   }
 
   /** Draw a full frame. */
   draw(scene: Scene, alpha: number): void {
     const ctx = this.ctx;
+    this.shakeX = scene.shakeX;
+    this.shakeY = scene.shakeY;
 
     // Letterbox background (device space).
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -121,6 +130,12 @@ export class Renderer {
     for (let i = 0; i < scene.fighterCount; i++) scene.fighters[i]!.draw(ctx);
     for (let i = 0; i < scene.bulletCount; i++) scene.bullets[i]!.draw(ctx);
     for (let i = 0; i < scene.explosionCount; i++) scene.explosions[i]!.draw(ctx);
+    // Particles glow additively.
+    if (scene.particleCount > 0) {
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < scene.particleCount; i++) scene.particles[i]!.draw(ctx);
+      ctx.globalCompositeOperation = "source-over";
+    }
     for (let i = 0; i < scene.popupCount; i++) scene.popups[i]!.draw(ctx);
 
     ctx.restore();
