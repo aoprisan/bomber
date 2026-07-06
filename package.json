@@ -1,0 +1,17 @@
+{
+  "name": "ww2-bomber-arcade",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "One-input WW2 bomber arcade PWA — mobile-first vertical scroller",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
