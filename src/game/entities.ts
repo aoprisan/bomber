@@ -26,9 +26,13 @@ export class Bomber {
   readonly radius = BOMBER.radius;
 
   /** Hit points and post-hit invulnerability timer (ms remaining). */
-  hp = HEALTH.maxHp;
-  maxHp = HEALTH.maxHp;
+  hp: number = HEALTH.maxHp;
+  maxHp: number = HEALTH.maxHp;
   private invulnMs = 0;
+
+  /** Maneuver multipliers, raised by the engine-boost upgrade. */
+  speedMul = 1;
+  responseMul = 1;
 
   constructor() {
     this.x = WORLD.width / 2;
@@ -42,8 +46,16 @@ export class Bomber {
     this.prevX = this.x;
     this.targetX = this.x;
     this.roll = 0;
+    this.maxHp = HEALTH.maxHp;
     this.hp = this.maxHp;
     this.invulnMs = 0;
+    this.speedMul = 1;
+    this.responseMul = 1;
+  }
+
+  /** Repair up to `amount` HP without exceeding max. */
+  heal(amount: number): void {
+    this.hp = Math.min(this.maxHp, this.hp + amount);
   }
 
   get invulnerable(): boolean {
@@ -74,9 +86,9 @@ export class Bomber {
     this.targetX = clamp(this.targetX, lo, hi);
 
     // Exponential chase, then cap the per-step displacement to maxLateralSpeed.
-    const chase = 1 - Math.exp(-BOMBER.lateralResponse * dt);
+    const chase = 1 - Math.exp(-BOMBER.lateralResponse * this.responseMul * dt);
     let desired = (this.targetX - this.x) * chase;
-    const maxStep = BOMBER.maxLateralSpeed * dt;
+    const maxStep = BOMBER.maxLateralSpeed * this.speedMul * dt;
     desired = clamp(desired, -maxStep, maxStep);
 
     this.x = clamp(this.x + desired, lo, hi);

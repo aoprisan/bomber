@@ -230,3 +230,111 @@ body {
     opacity: 1;
   }
 }
+
+/* ---- Upgrade picker ---- */
+.upgrade {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 12, 28, 0.82),
+    rgba(2, 3, 9, 0.95)
+  );
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+  animation: fade-in 0.25s ease both;
+}
+
+.upgrade.hidden {
+  display: none;
+}
+
+.upgrade-title {
+  text-align: center;
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ffd27a;
+  text-shadow: 0 0 16px rgba(255, 160, 50, 0.4);
+}
+
+.upgrade-title span {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: #8b96b8;
+}
+
+.upgrade-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.upgrade-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 18px;
+  text-align: left;
+  background: linear-gradient(160deg, rgba(30, 40, 66, 0.9), rgba(18, 24, 44, 0.9));
+  border: 1px solid rgba(140, 170, 230, 0.22);
+  border-radius: 14px;
+  color: #e7ecfb;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.upgrade-card:active {
+  transform: scale(0.98);
+}
+
+.upgrade-card:hover {
+  border-color: rgba(255, 200, 120, 0.6);
+  background: linear-gradient(160deg, rgba(42, 54, 84, 0.95), rgba(24, 32, 56, 0.95));
+}
+
+.upgrade-name {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  color: #ffd894;
+}
+
+.upgrade-desc {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #aeb9db;
+}
+
+.upgrade-pips {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.upip {
+  width: 20px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.upip.owned {
+  background: #ffb454;
+}
+
+.upip.gain {
+  background: #7ee0a0;
+  box-shadow: 0 0 8px rgba(126, 224, 160, 0.7);
+}

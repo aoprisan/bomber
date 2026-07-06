@@ -33,6 +33,7 @@ export class GameOverScreen {
     this.stats.innerHTML = "";
     this.stats.append(
       statRow("SCORE", stats.score.toLocaleString("en-US"), true),
+      statRow("SEGMENT REACHED", String(stats.segment)),
       statRow("TARGETS HIT", String(stats.targetsHit)),
       statRow("BEST COMBO", `x${Math.min(8, 1 + Math.floor(stats.bestCombo / 3))}`),
       statRow("SURVIVED", `${secs}s`),

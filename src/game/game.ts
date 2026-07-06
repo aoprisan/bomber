@@ -1,5 +1,6 @@
 import { PointerInput } from "../engine/input";
 import { Pool } from "../engine/pool";
+import { Bullet } from "./bullets";
 import { Explosion, ScorePopup } from "./effects";
 import { Bomber, clamp } from "./entities";
 import { Renderer, Scene } from "./render";
@@ -21,9 +22,20 @@ import {
   SCROLL,
   SPAWN,
   TRACER,
+  UPGRADES,
 } from "./tuning";
+import {
+  createMods,
+  isMaxed,
+  resetMods,
+  rollChoices,
+  UpgradeDef,
+  UpgradeKey,
+  UpgradeMods,
+  upgradeByKey,
+} from "./upgrades";
 
-export type Phase = "playing" | "over";
+export type Phase = "playing" | "upgrade" | "over";
 
 export interface RunStats {
   timeMs: number;
@@ -31,10 +43,13 @@ export interface RunStats {
   score: number;
   targetsHit: number;
   bestCombo: number;
+  segment: number;
 }
 
 export interface GameCallbacks {
   onGameOver(stats: RunStats): void;
+  /** A segment cleared; offer one of these upgrades (segment is 1-based). */
+  onUpgrade(choices: readonly UpgradeDef[], segment: number): void;
 }
 
 /**
@@ -56,6 +71,12 @@ export class Game {
   comboHits = 0;
   bestCombo = 0;
 
+  /** Roguelite state. */
+  readonly mods: UpgradeMods = createMods();
+  segment = 0;
+  private nextSegmentMs = UPGRADES.segmentMs;
+  private tailgunTimer = 0;
+
   private readonly flak = new Pool<Flak>(SPAWN.maxFlak, () => new Flak(), () => {});
   private readonly targets = new Pool<Target>(SPAWN.maxTargets, () => new Target(), () => {});
   private readonly tracers = new Pool<Tracer>(SPAWN.maxTracers, () => new Tracer(), () => {});
@@ -66,6 +87,11 @@ export class Game {
     () => {},
   );
   private readonly fighters = new Pool<Fighter>(SPAWN.maxFighters, () => new Fighter(), () => {});
+  private readonly bullets = new Pool<Bullet>(
+    UPGRADES.tailgun.maxBullets,
+    () => new Bullet(),
+    () => {},
+  );
   private readonly explosions = new Pool<Explosion>(
     EXPLOSION.maxExplosions,
     () => new Explosion(),
@@ -100,6 +126,7 @@ export class Game {
     this.balloons.clear();
     this.searchlights.clear();
     this.fighters.clear();
+    this.bullets.clear();
     this.explosions.clear();
     this.popups.clear();
     this.spawner.reset();
@@ -111,8 +138,40 @@ export class Game {
     this.comboHits = 0;
     this.bestCombo = 0;
     this.nudge = 0;
+    this.segment = 0;
+    this.nextSegmentMs = UPGRADES.segmentMs;
+    this.tailgunTimer = 0;
+    resetMods(this.mods);
     this.phase = "playing";
     this.input.poll();
+  }
+
+  /** Apply the chosen upgrade and resume the raid. Called by the UI. */
+  chooseUpgrade(key: UpgradeKey): void {
+    if (this.phase !== "upgrade") return;
+    if (!isMaxed(this.mods, key)) {
+      this.mods.levels[key]++;
+      upgradeByKey(key).apply(this.bomber, this.mods);
+    }
+    this.nextSegmentMs += UPGRADES.segmentMs;
+    this.phase = "playing";
+    this.input.poll();
+  }
+
+  private enterUpgrade(): void {
+    this.segment++;
+    // Self-sealing tanks repair on surviving a segment.
+    if (this.mods.regenLevel > 0) {
+      this.bomber.heal(this.mods.regenLevel * UPGRADES.tanks.hpPerLevelPerSegment);
+    }
+    const choices = rollChoices(this.mods);
+    if (choices.length === 0) {
+      // Everything maxed — nothing to offer; keep flying.
+      this.nextSegmentMs += UPGRADES.segmentMs;
+      return;
+    }
+    this.phase = "upgrade";
+    this.cb.onUpgrade(choices, this.segment);
   }
 
   update(dtMs: number): void {
@@ -125,6 +184,12 @@ export class Game {
 
     const dt = dtMs / 1000;
     this.elapsedMs += dtMs;
+
+    // Raid segment boundary -> offer upgrades (freezes the sim if it opens one).
+    if (this.elapsedMs >= this.nextSegmentMs) {
+      this.enterUpgrade();
+      if (this.phase !== "playing") return;
+    }
 
     this.applyInput();
     this.nudge -= this.nudge * clamp(SCROLL.nudgeDecay * dt, 0, 1);
@@ -197,11 +262,80 @@ export class Game {
     this.fighters.forEach((ft) => {
       ft.update(dtMs);
       if (ft.dead) return true;
-      if (ft.hitsBomber(bx, by, br)) this.hitBomber(FIGHTER.damage);
+      if (ft.hitsBomber(bx, by, br)) {
+        if (this.mods.flares > 0) {
+          // Decoy flare negates the attack and downs the fighter.
+          this.mods.flares--;
+          ft.damage(999);
+          this.spawnPopup(bx, by - 24, "FLARE!");
+        } else {
+          this.hitBomber(FIGHTER.damage);
+        }
+      }
       return false;
     });
 
+    this.updateTailGunner(dtMs, bx, by);
+
+    this.bullets.forEach((b) => {
+      b.update(dt);
+      if (b.offscreen) return true;
+      return this.bulletHitsFighter(b);
+    });
+
     this.stepEffects(dtMs);
+  }
+
+  /** Fire on an interval at the nearest alive fighter, if a tail gunner is equipped. */
+  private updateTailGunner(dtMs: number, bx: number, by: number): void {
+    if (this.mods.tailgunLevel <= 0) return;
+    if (this.tailgunTimer > 0) this.tailgunTimer -= dtMs;
+
+    const target = this.nearestFighter();
+    if (!target || this.tailgunTimer > 0) return;
+
+    const b = this.bullets.spawn();
+    if (b) b.spawn(bx, by - this.bomber.radius, target.x, target.y);
+    const t = UPGRADES.tailgun;
+    this.tailgunTimer = Math.max(
+      t.minIntervalMs,
+      t.baseIntervalMs - (this.mods.tailgunLevel - 1) * t.intervalDropPerLevel,
+    );
+  }
+
+  private nearestFighter(): Fighter | null {
+    let best: Fighter | null = null;
+    let bestD = Infinity;
+    const { x: bx, y: by } = this.bomber;
+    const buf = this.fighters.buffer;
+    for (let i = 0; i < this.fighters.active; i++) {
+      const ft = buf[i]!;
+      if (!ft.alive) continue;
+      const d = (ft.x - bx) ** 2 + (ft.y - by) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = ft;
+      }
+    }
+    return best;
+  }
+
+  /** Returns true (release the bullet) if it struck a fighter. */
+  private bulletHitsFighter(b: Bullet): boolean {
+    const buf = this.fighters.buffer;
+    const hitR = UPGRADES.tailgun.bulletRadius + 12;
+    for (let i = 0; i < this.fighters.active; i++) {
+      const ft = buf[i]!;
+      if (!ft.alive) continue;
+      if ((ft.x - b.x) ** 2 + (ft.y - b.y) ** 2 <= hitR * hitR) {
+        if (ft.damage(UPGRADES.tailgun.damage)) {
+          const e = this.explosions.spawn();
+          if (e) e.spawn(ft.x, ft.y, b.x, b.y);
+        }
+        return true;
+      }
+    }
+    return false;
   }
 
   private stepEffects(dtMs: number): void {
@@ -231,11 +365,24 @@ export class Game {
 
   private tryBomb(t: Target): void {
     if (Math.abs(t.y - this.reticleY) > BOMB.dropBandHalf) return;
-    if (Math.abs(t.x - this.bomber.x) > t.halfWidth + BOMB.aimTolerance) return;
-    this.dropBomb(t);
+    const aim = t.halfWidth + BOMB.aimTolerance + this.mods.spreadAimBonus;
+    if (Math.abs(t.x - this.bomber.x) > aim) return;
+    this.bombTarget(t);
+
+    // Wide bomb spread: splash un-bombed neighbors near the impact.
+    if (this.mods.spreadSplashX > 0) {
+      const buf = this.targets.buffer;
+      for (let i = 0; i < this.targets.active; i++) {
+        const n = buf[i]!;
+        if (n === t || n.bombed) continue;
+        if (Math.abs(n.x - t.x) <= this.mods.spreadSplashX && Math.abs(n.y - t.y) <= 40) {
+          this.bombTarget(n);
+        }
+      }
+    }
   }
 
-  private dropBomb(t: Target): void {
+  private bombTarget(t: Target): void {
     t.bombed = true;
     this.comboHits++;
     if (this.comboHits > this.bestCombo) this.bestCombo = this.comboHits;
@@ -247,8 +394,12 @@ export class Game {
 
     const e = this.explosions.spawn();
     if (e) e.spawn(t.x, t.y, this.bomber.x, this.bomber.y);
+    this.spawnPopup(t.x, t.y, mult > 1 ? `+${points} x${mult}` : `+${points}`);
+  }
+
+  private spawnPopup(x: number, y: number, text: string): void {
     const p = this.popups.spawn();
-    if (p) p.spawn(t.x, t.y, mult > 1 ? `+${points} x${mult}` : `+${points}`);
+    if (p) p.spawn(x, y, text);
   }
 
   private collideFlak(f: Flak): void {
@@ -277,6 +428,7 @@ export class Game {
       score: this.score,
       targetsHit: this.targetsHit,
       bestCombo: this.bestCombo,
+      segment: this.segment + 1,
     });
   }
 
@@ -295,6 +447,8 @@ export class Game {
       searchlightCount: this.searchlights.active,
       fighters: this.fighters.buffer,
       fighterCount: this.fighters.active,
+      bullets: this.bullets.buffer,
+      bulletCount: this.bullets.active,
       explosions: this.explosions.buffer,
       explosionCount: this.explosions.active,
       popups: this.popups.buffer,

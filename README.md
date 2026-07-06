@@ -17,7 +17,7 @@ Milestones:
 2. ✅ Scrolling ground, flak bursts w/ telegraphs, HP/damage, game over
 3. ✅ Targets + bombsight auto-bombing + combo scoring
 4. ✅ Tracers, searchlights + night fighters, barrage balloons
-5. Upgrade system + roguelite segments
+5. ✅ Upgrade system + roguelite segments
 6. Audio, particles, polish, difficulty curve
 
 ## Develop

@@ -317,3 +317,47 @@ export const SCORING = {
   popupColor: "#ffe9b0",
 } as const;
 
+// ---------------------------------------------------------------------------
+// M5 — roguelite segments + upgrades
+// ---------------------------------------------------------------------------
+
+/**
+ * After each raid segment the run pauses to offer 1 of 3 upgrades. Segment
+ * length and every upgrade's magnitude/cap live here; the pick logic + copy
+ * live in upgrades.ts. Keys must match the UPGRADE_DEFS in that file.
+ */
+export const UPGRADES = {
+  /** Raid segment length (spec: 45-60s). */
+  segmentMs: 50_000,
+  /** How many choices to offer per segment. */
+  choices: 3,
+  /** Per-upgrade caps (how many times each can be taken). */
+  maxLevel: {
+    armor: 3,
+    spread: 2,
+    flares: 3,
+    tailgun: 3,
+    engine: 3,
+    tanks: 2,
+  },
+  /** Wider bomb spread: extra aim tolerance + splash x, per level. */
+  spread: { aimBonusPerLevel: 20, splashXPerLevel: 30 },
+  /** Decoy flares gained per pick. */
+  flares: { perPick: 1 },
+  /** Tail gunner: shoots the nearest alive fighter on an interval. */
+  tailgun: {
+    baseIntervalMs: 640,
+    intervalDropPerLevel: 130,
+    minIntervalMs: 240,
+    damage: 1,
+    bulletSpeed: 720,
+    bulletRadius: 4,
+    color: "#9fe8ff",
+    maxBullets: 24,
+  },
+  /** Engine boost: maneuver multipliers added per level. */
+  engine: { speedMulPerLevel: 0.22, responseMulPerLevel: 0.4 },
+  /** Self-sealing tanks: HP repaired per segment, per level. */
+  tanks: { hpPerLevelPerSegment: 1 },
+} as const;
+

@@ -48,8 +48,13 @@ export class Fighter {
     return false;
   }
 
+  /** Horizontal position (the strafe lane). */
+  get x(): number {
+    return this.laneX;
+  }
+
   /** Vertical position of the fighter sprite. */
-  private get shipY(): number {
+  get y(): number {
     if (this.phase === "telegraph") return -18;
     const t = clamp((this.age - FIGHTER.telegraphMs) / FIGHTER.strafeMs, 0, 1);
     return -18 + t * (WORLD.height + 36);
@@ -80,7 +85,7 @@ export class Fighter {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
-      this.drawShip(ctx, x, this.shipY, 0.6);
+      this.drawShip(ctx, x, this.y, 0.6);
       return;
     }
 
@@ -100,7 +105,7 @@ export class Fighter {
       ctx.stroke();
       // Tracer rounds streaking ahead (below) the fighter.
       ctx.fillStyle = FIGHTER.tracer;
-      const y = this.shipY;
+      const y = this.y;
       for (let i = 1; i <= 4; i++) {
         ctx.beginPath();
         ctx.arc(x, y + i * 22, 2.2, 0, Math.PI * 2);
@@ -108,7 +113,7 @@ export class Fighter {
       }
     }
 
-    this.drawShip(ctx, x, this.shipY, 1);
+    this.drawShip(ctx, x, this.y, 1);
     ctx.globalAlpha = 1;
   }
 

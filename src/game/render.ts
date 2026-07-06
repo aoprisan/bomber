@@ -1,3 +1,4 @@
+import { Bullet } from "./bullets";
 import { Explosion, ScorePopup } from "./effects";
 import { Bomber } from "./entities";
 import { Target } from "./targets";
@@ -26,6 +27,8 @@ export interface Scene {
   searchlightCount: number;
   fighters: readonly Fighter[];
   fighterCount: number;
+  bullets: readonly Bullet[];
+  bulletCount: number;
   explosions: readonly Explosion[];
   explosionCount: number;
   popups: readonly ScorePopup[];
@@ -116,6 +119,7 @@ export class Renderer {
     for (let i = 0; i < scene.flakCount; i++) scene.flak[i]!.draw(ctx);
     if (scene.bomber.visible) this.drawBomber(scene.bomber, alpha);
     for (let i = 0; i < scene.fighterCount; i++) scene.fighters[i]!.draw(ctx);
+    for (let i = 0; i < scene.bulletCount; i++) scene.bullets[i]!.draw(ctx);
     for (let i = 0; i < scene.explosionCount; i++) scene.explosions[i]!.draw(ctx);
     for (let i = 0; i < scene.popupCount; i++) scene.popups[i]!.draw(ctx);
 

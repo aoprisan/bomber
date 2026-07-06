@@ -5,6 +5,7 @@ import { Game } from "./game/game";
 import { Renderer } from "./game/render";
 import { GameOverScreen } from "./ui/gameover";
 import { Hud } from "./ui/hud";
+import { UpgradePicker } from "./ui/upgrade";
 
 function boot(): void {
   const canvas = document.getElementById("game") as HTMLCanvasElement | null;
@@ -22,9 +23,14 @@ function boot(): void {
     gameOver.hide();
     game.restart();
   });
+  const upgrades = new UpgradePicker(ui, (key) => {
+    upgrades.hide();
+    game.chooseUpgrade(key);
+  });
 
   const game = new Game(input, renderer, {
     onGameOver: (stats) => gameOver.show(stats),
+    onUpgrade: (choices, segment) => upgrades.show(choices, segment, game.mods),
   });
 
   const loop = new GameLoop({
