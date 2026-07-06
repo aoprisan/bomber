@@ -1,10 +1,18 @@
 /*
- * Service worker: cache-first for the app shell and all same-origin assets,
- * so Night Raid is installable and fully playable offline. Vite fingerprints
- * asset filenames, so runtime caching handles them safely — a new build ships
- * new URLs and old ones are swept on activate via the version bump.
+ * Service worker: keeps Night Raid installable and playable offline without
+ * ever stranding a returning visitor on a stale shell.
+ *
+ * Strategy:
+ *   - Navigations (the HTML document): NETWORK-FIRST. Always fetch the current
+ *     index.html when online so it references the current hashed bundles;
+ *     fall back to the cached shell only when offline. This is the crucial
+ *     fix: a cache-first document could keep pointing at fingerprinted asset
+ *     files that a newer deploy has since deleted from the server -> 404 ->
+ *     blank page.
+ *   - Fingerprinted assets (immutable): CACHE-FIRST, populated at runtime.
+ *   - Bumping VERSION sweeps every older cache on activate.
  */
-const VERSION = "night-raid-v1";
+const VERSION = "night-raid-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -40,23 +48,33 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Documents: network-first so the app always boots the latest build online.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(VERSION).then((cache) => cache.put("./index.html", clone));
+          return response;
+        })
+        .catch(() => caches.match(request).then((c) => c || caches.match("./index.html"))),
+    );
+    return;
+  }
+
+  // Fingerprinted assets: cache-first, fall back to network (and cache it).
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request)
         .then((response) => {
-          // Cache successful, cacheable responses for next time.
           if (response.ok && response.type === "basic") {
             const clone = response.clone();
             caches.open(VERSION).then((cache) => cache.put(request, clone));
           }
           return response;
         })
-        .catch(() => {
-          // Offline navigation falls back to the cached shell.
-          if (request.mode === "navigate") return caches.match("./index.html");
-          return Response.error();
-        });
+        .catch(() => Response.error());
     }),
   );
 });
