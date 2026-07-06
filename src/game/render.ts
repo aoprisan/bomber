@@ -1,14 +1,25 @@
+import { Explosion, ScorePopup } from "./effects";
 import { Bomber } from "./entities";
+import { Target } from "./targets";
 import { Flak } from "./threats/flak";
-import { GROUND, WORLD } from "./tuning";
+import { BOMB, GROUND, WORLD } from "./tuning";
 
-/** Everything the renderer needs to draw one frame. */
+/**
+ * Everything the renderer needs to draw one frame. Entity lists are pool
+ * backing buffers; only indices [0, count) are live.
+ */
 export interface Scene {
   bomber: Bomber;
-  /** Pool backing buffer; only [0, flakCount) are live. */
   flak: readonly Flak[];
   flakCount: number;
+  targets: readonly Target[];
+  targetCount: number;
+  explosions: readonly Explosion[];
+  explosionCount: number;
+  popups: readonly ScorePopup[];
+  popupCount: number;
   scrollY: number;
+  showReticle: boolean;
 }
 
 /**
@@ -84,10 +95,56 @@ export class Renderer {
     this.drawSky();
     this.drawParallax(scene.scrollY);
     this.drawGround(scene.scrollY);
+    for (let i = 0; i < scene.targetCount; i++) scene.targets[i]!.draw(ctx);
+    if (scene.showReticle) this.drawReticle(scene.bomber, alpha);
     for (let i = 0; i < scene.flakCount; i++) scene.flak[i]!.draw(ctx);
     if (scene.bomber.visible) this.drawBomber(scene.bomber, alpha);
+    for (let i = 0; i < scene.explosionCount; i++) scene.explosions[i]!.draw(ctx);
+    for (let i = 0; i < scene.popupCount; i++) scene.popups[i]!.draw(ctx);
 
     ctx.restore();
+  }
+
+  /** Bombsight: a bracket ahead of the plane marking the predicted impact. */
+  private drawReticle(bomber: Bomber, alpha: number): void {
+    const ctx = this.ctx;
+    const x = bomber.renderX(alpha);
+    const y = bomber.y - BOMB.leadDistance;
+    const h = BOMB.reticleHalf;
+
+    // Faint guide line from the plane up to the sight.
+    ctx.strokeStyle = "rgba(159,232,255,0.14)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, bomber.y - bomber.radius);
+    ctx.lineTo(x, y + h);
+    ctx.stroke();
+
+    // Corner brackets.
+    ctx.strokeStyle = BOMB.reticleColor;
+    ctx.lineWidth = 2;
+    const c = 7;
+    ctx.beginPath();
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ] as const) {
+      const cx = x + sx * h;
+      const cy = y + sy * h;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx - sx * c, cy);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx, cy - sy * c);
+    }
+    ctx.stroke();
+
+    // Center dot.
+    ctx.fillStyle = BOMB.reticleColor;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawSky(): void {

@@ -32,6 +32,9 @@ export class GameOverScreen {
     const secs = (stats.timeMs / 1000).toFixed(1);
     this.stats.innerHTML = "";
     this.stats.append(
+      statRow("SCORE", stats.score.toLocaleString("en-US"), true),
+      statRow("TARGETS HIT", String(stats.targetsHit)),
+      statRow("BEST COMBO", `x${Math.min(8, 1 + Math.floor(stats.bestCombo / 3))}`),
       statRow("SURVIVED", `${secs}s`),
       statRow("HITS TAKEN", String(stats.hitsTaken)),
     );
@@ -43,9 +46,9 @@ export class GameOverScreen {
   }
 }
 
-function statRow(label: string, value: string): HTMLDivElement {
+function statRow(label: string, value: string, highlight = false): HTMLDivElement {
   const row = document.createElement("div");
-  row.className = "stat-row";
+  row.className = highlight ? "stat-row stat-hero" : "stat-row";
   const l = document.createElement("span");
   l.className = "stat-label";
   l.textContent = label;

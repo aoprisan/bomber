@@ -1,10 +1,24 @@
 import { clamp } from "./entities";
-import { FLAK, SPAWN, WORLD } from "./tuning";
+import { FLAK, SPAWN, TARGET, WORLD } from "./tuning";
 
 /** Where a burst wants to appear. The game maps this into its flak pool. */
 export interface BurstRequest {
   x: number;
   y: number;
+}
+
+/** A target to scroll in from above. */
+export interface TargetRequest {
+  x: number;
+  y: number;
+  typeIndex: number;
+  seed: number;
+}
+
+/** Everything the director wants to spawn this step. */
+export interface SpawnBatch {
+  flak: BurstRequest[];
+  targets: TargetRequest[];
 }
 
 /**
@@ -15,25 +29,41 @@ export interface BurstRequest {
 export class Spawner {
   private elapsedMs = 0;
   private nextFlakMs: number = SPAWN.flakStartDelayMs;
+  private nextTargetMs: number = SPAWN.targetStartDelayMs;
 
   reset(): void {
     this.elapsedMs = 0;
     this.nextFlakMs = SPAWN.flakStartDelayMs;
+    this.nextTargetMs = SPAWN.targetStartDelayMs;
   }
 
-  /** Advance time; return any bursts to spawn this step. */
-  update(dtMs: number): BurstRequest[] {
+  /** Advance time; return everything to spawn this step. */
+  update(dtMs: number): SpawnBatch {
     this.elapsedMs += dtMs;
-    const out: BurstRequest[] = [];
+    const batch: SpawnBatch = { flak: [], targets: [] };
 
     if (this.elapsedMs >= this.nextFlakMs) {
-      out.push(this.randomBurst());
+      batch.flak.push(this.randomBurst());
       // Difficulty ramp: occasionally fire a second burst as the raid heats up.
-      if (Math.random() < this.doubleChance()) out.push(this.randomBurst());
+      if (Math.random() < this.doubleChance()) batch.flak.push(this.randomBurst());
       this.nextFlakMs = this.elapsedMs + this.currentInterval();
     }
 
-    return out;
+    if (this.elapsedMs >= this.nextTargetMs) {
+      batch.targets.push(this.randomTarget());
+      const gap = SPAWN.targetGapMs + Math.random() * SPAWN.targetGapJitterMs;
+      this.nextTargetMs = this.elapsedMs + gap;
+    }
+
+    return batch;
+  }
+
+  private randomTarget(): TargetRequest {
+    const typeIndex = Math.floor(Math.random() * TARGET.types.length);
+    const halfW = TARGET.types[typeIndex]!.w / 2;
+    const pad = TARGET.edgePad + halfW;
+    const x = pad + Math.random() * (WORLD.width - pad * 2);
+    return { x, y: -40, typeIndex, seed: Math.floor(Math.random() * 1000) };
   }
 
   /** 0..1 progress along the difficulty ramp. */

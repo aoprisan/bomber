@@ -11,14 +11,11 @@ Vite, and a hand-rolled service worker. Deploys to GitHub Pages.
 
 ## Status
 
-Milestone 1 — scaffold: Vite + TS (strict) + PWA + Pages deploy, canvas
-rendering a drag-controlled bomber over a scrolling night sky.
-
-Planned milestones:
+Milestones:
 
 1. ✅ Scaffold + moving bomber with drag input
-2. Scrolling ground, flak bursts w/ telegraphs, HP/damage, game over
-3. Targets + auto-bombing + scoring
+2. ✅ Scrolling ground, flak bursts w/ telegraphs, HP/damage, game over
+3. ✅ Targets + bombsight auto-bombing + combo scoring
 4. Tracers, searchlights + fighters, balloons
 5. Upgrade system + roguelite segments
 6. Audio, particles, polish, difficulty curve
