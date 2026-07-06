@@ -45,6 +45,130 @@ body {
     env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-#ui > * {
+/* ---- HUD ---- */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  pointer-events: none;
+}
+
+.hud-hp {
+  display: flex;
+  gap: 7px;
+}
+
+.pip {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  transform: rotate(45deg);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.pip-full {
+  background: linear-gradient(160deg, #ff8a5b, #ff3d2e);
+  border: 1px solid #ffcaa8;
+}
+
+.pip-empty {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.hud-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  color: #c8d3f0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* ---- Game over ---- */
+.gameover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 10, 24, 0.72),
+    rgba(2, 3, 9, 0.92)
+  );
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.35s ease both;
+  /* #ui is pointer-events:none; the menu must re-enable interaction. */
   pointer-events: auto;
+}
+
+.gameover.hidden {
+  display: none;
+}
+
+.gameover-title {
+  font-size: clamp(34px, 11vw, 60px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ff5a3c;
+  text-shadow: 0 0 24px rgba(255, 70, 40, 0.5);
+}
+
+.gameover-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  letter-spacing: 0.05em;
+  color: #aeb9db;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+}
+
+.stat-value {
+  color: #f2f5ff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn {
+  margin-top: 8px;
+  padding: 15px 34px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #06121f;
+  background: linear-gradient(160deg, #ffd27a, #ff9a3c);
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(255, 140, 40, 0.35);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

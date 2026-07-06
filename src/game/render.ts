@@ -1,5 +1,15 @@
 import { Bomber } from "./entities";
+import { Flak } from "./threats/flak";
 import { GROUND, WORLD } from "./tuning";
+
+/** Everything the renderer needs to draw one frame. */
+export interface Scene {
+  bomber: Bomber;
+  /** Pool backing buffer; only [0, flakCount) are live. */
+  flak: readonly Flak[];
+  flakCount: number;
+  scrollY: number;
+}
 
 /**
  * Canvas renderer. Owns device-pixel sizing and a world->screen transform
@@ -55,8 +65,8 @@ export class Renderer {
     );
   }
 
-  /** Draw a full frame. `scrollY` is total world distance scrolled so far. */
-  draw(bomber: Bomber, scrollY: number, alpha: number): void {
+  /** Draw a full frame. */
+  draw(scene: Scene, alpha: number): void {
     const ctx = this.ctx;
 
     // Letterbox background (device space).
@@ -72,9 +82,10 @@ export class Renderer {
     ctx.clip();
 
     this.drawSky();
-    this.drawParallax(scrollY);
-    this.drawGround(scrollY);
-    this.drawBomber(bomber, alpha);
+    this.drawParallax(scene.scrollY);
+    this.drawGround(scene.scrollY);
+    for (let i = 0; i < scene.flakCount; i++) scene.flak[i]!.draw(ctx);
+    if (scene.bomber.visible) this.drawBomber(scene.bomber, alpha);
 
     ctx.restore();
   }
@@ -119,16 +130,43 @@ export class Renderer {
     ctx.fillStyle = GROUND.color;
     ctx.fillRect(0, top, WORLD.width, bandH);
 
-    // Scrolling grid of "city block" ticks along the ground for motion cues.
-    ctx.strokeStyle = "rgba(120,150,220,0.10)";
-    ctx.lineWidth = 1;
-    const spacing = 46;
-    const shift = scrollY % spacing;
+    // A river ribbon winding down the band as a scrolling landmark.
+    ctx.fillStyle = GROUND.riverColor;
     ctx.beginPath();
-    for (let y = top + shift; y < WORLD.height; y += spacing) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(WORLD.width, y);
+    const rw = 26;
+    for (let y = top; y <= WORLD.height; y += 8) {
+      const cx = WORLD.width * 0.5 + Math.sin((y + scrollY) * 0.02) * WORLD.width * 0.22;
+      if (y === top) ctx.moveTo(cx - rw / 2, y);
+      else ctx.lineTo(cx - rw / 2, y);
     }
+    for (let y = WORLD.height; y >= top; y -= 8) {
+      const cx = WORLD.width * 0.5 + Math.sin((y + scrollY) * 0.02) * WORLD.width * 0.22;
+      ctx.lineTo(cx + rw / 2, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Scrolling "city blocks": a hashed grid of little rooftops for motion cues.
+    const cell = 34;
+    const shift = scrollY % cell;
+    for (let gy = -1; gy < bandH / cell + 1; gy++) {
+      const wy = top + gy * cell + shift;
+      for (let gx = 0; gx < WORLD.width / cell; gx++) {
+        const h = hash2(gx, gy + Math.floor(scrollY / cell));
+        if (h < 0.4) continue;
+        const wx = gx * cell + 4;
+        const s = cell - 8;
+        ctx.fillStyle = h > 0.8 ? GROUND.blockLight : GROUND.blockColor;
+        ctx.fillRect(wx, wy + 3, s * (0.5 + h * 0.4), s * 0.5);
+      }
+    }
+
+    // Faint horizon line where sky meets ground.
+    ctx.strokeStyle = "rgba(120,150,220,0.14)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, top);
+    ctx.lineTo(WORLD.width, top);
     ctx.stroke();
   }
 

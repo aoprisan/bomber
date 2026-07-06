@@ -70,9 +70,85 @@ export const GROUND = {
   /** Fraction of world height occupied by the ground band at the bottom. */
   bandHeight: 0.18,
   color: "#070b16",
+  /** Slightly lighter roofs / rubble speckle on the ground band. */
+  blockColor: "#0e1630",
+  blockLight: "#16204a",
+  /** River ribbon winding down the ground for a landmark. */
+  riverColor: "#0c1b3a",
   /** Parallax layers drawn behind the play-field (far -> near). */
   parallax: [
     { speed: 0.35, color: "#0b1330", size: 3 },
     { speed: 0.6, color: "#111c40", size: 4 },
   ],
 } as const;
+
+// ---------------------------------------------------------------------------
+// M2 — health, flak, spawning
+// ---------------------------------------------------------------------------
+
+export const HEALTH = {
+  /** Starting / max hit points. Upgrades (M5) raise this. */
+  maxHp: 3,
+  /** Invulnerability window after taking a hit (ms). */
+  iframesMs: 1100,
+  /** Blink rate of the bomber while invulnerable (blinks / second). */
+  blinkHz: 8,
+} as const;
+
+/**
+ * Flak burst — area denial. Lifecycle is entirely time-driven so the whole
+ * "feel" is tunable here:
+ *   telegraph : ground muzzle flash + growing reticle at the marked point
+ *   expand    : blast circle punches out to blastRadius (starts damaging)
+ *   linger    : full-size blast dwells (still damaging)
+ *   fade      : blast shrinks/dims, harmless
+ */
+export const FLAK = {
+  /** Delay from muzzle flash to the blast — the core telegraph window (ms). */
+  telegraphMs: 1000,
+  /** Blast punch-out duration (ms). */
+  expandMs: 240,
+  /** Full-size damaging dwell (ms). */
+  lingerMs: 200,
+  /** Harmless fade-out (ms). */
+  fadeMs: 340,
+  /** Max blast radius (world units). */
+  blastRadius: 76,
+  /** Damaging fraction of the current visual radius (blast "core"). */
+  coreFraction: 0.86,
+  /** HP removed per hit. */
+  damage: 1,
+  /** Reticle ring size shown during telegraph (world units). */
+  reticleRadius: 26,
+  /** Bursts spawn within this vertical band (fraction of world height). */
+  minY: 0.28,
+  maxY: 0.8,
+  /** Keep burst centers this far off the play-field edges (world units). */
+  edgePad: 44,
+  /** Palette. */
+  flash: "#fff0c4",
+  reticle: "#ff5a3c",
+  blastInner: "#ffd98a",
+  blastOuter: "#ff7a1e",
+} as const;
+
+/**
+ * Spawn director. A simple time-based difficulty ramp lives here; the full
+ * curve arrives in M6, but the shape is already data-driven.
+ */
+export const SPAWN = {
+  /** Grace period before the first flak burst (ms). */
+  flakStartDelayMs: 2600,
+  /** Base gap between bursts at the start of a run (ms). */
+  flakIntervalMs: 2100,
+  /** Ramp floor — smallest gap between bursts (ms). */
+  flakIntervalMinMs: 850,
+  /** Play time over which the interval ramps from base to floor (ms). */
+  flakRampMs: 90_000,
+  /** Chance a spawn tick fires a second simultaneous burst (ramps to x2). */
+  doubleChanceStart: 0.0,
+  doubleChanceEnd: 0.55,
+  /** Object-pool capacity for live flak bursts. */
+  maxFlak: 40,
+} as const;
+

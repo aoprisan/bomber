@@ -20,6 +20,14 @@ export class Pool<T> {
     return this.activeCount;
   }
 
+  /**
+   * The backing store. Only indices [0, active) are live; callers must not
+   * read past `active`. Exposed for zero-allocation read iteration (rendering).
+   */
+  get buffer(): readonly T[] {
+    return this.items;
+  }
+
   /** Grab a fresh object, or null if the pool is exhausted. */
   spawn(): T | null {
     if (this.activeCount >= this.items.length) return null;
