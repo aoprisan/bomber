@@ -1,5 +1,7 @@
 import { clamp } from "./entities";
-import { FLAK, SPAWN, TARGET, WORLD } from "./tuning";
+import { BALLOON, FLAK, SPAWN, TARGET, TRACER, WORLD } from "./tuning";
+
+const DEG = Math.PI / 180;
 
 /** Where a burst wants to appear. The game maps this into its flak pool. */
 export interface BurstRequest {
@@ -15,10 +17,29 @@ export interface TargetRequest {
   seed: number;
 }
 
+export interface TracerRequest {
+  ox: number;
+  a0: number;
+  a1: number;
+}
+
+export interface BalloonRequest {
+  x: number;
+  y: number;
+}
+
+export interface SearchlightRequest {
+  ox: number;
+  baseAngle: number;
+}
+
 /** Everything the director wants to spawn this step. */
 export interface SpawnBatch {
   flak: BurstRequest[];
   targets: TargetRequest[];
+  tracers: TracerRequest[];
+  balloons: BalloonRequest[];
+  searchlights: SearchlightRequest[];
 }
 
 /**
@@ -30,17 +51,29 @@ export class Spawner {
   private elapsedMs = 0;
   private nextFlakMs: number = SPAWN.flakStartDelayMs;
   private nextTargetMs: number = SPAWN.targetStartDelayMs;
+  private nextTracerMs: number = SPAWN.tracerStartDelayMs;
+  private nextBalloonMs: number = SPAWN.balloonStartDelayMs;
+  private nextSearchlightMs: number = SPAWN.searchlightStartDelayMs;
 
   reset(): void {
     this.elapsedMs = 0;
     this.nextFlakMs = SPAWN.flakStartDelayMs;
     this.nextTargetMs = SPAWN.targetStartDelayMs;
+    this.nextTracerMs = SPAWN.tracerStartDelayMs;
+    this.nextBalloonMs = SPAWN.balloonStartDelayMs;
+    this.nextSearchlightMs = SPAWN.searchlightStartDelayMs;
   }
 
   /** Advance time; return everything to spawn this step. */
   update(dtMs: number): SpawnBatch {
     this.elapsedMs += dtMs;
-    const batch: SpawnBatch = { flak: [], targets: [] };
+    const batch: SpawnBatch = {
+      flak: [],
+      targets: [],
+      tracers: [],
+      balloons: [],
+      searchlights: [],
+    };
 
     if (this.elapsedMs >= this.nextFlakMs) {
       batch.flak.push(this.randomBurst());
@@ -51,11 +84,51 @@ export class Spawner {
 
     if (this.elapsedMs >= this.nextTargetMs) {
       batch.targets.push(this.randomTarget());
-      const gap = SPAWN.targetGapMs + Math.random() * SPAWN.targetGapJitterMs;
-      this.nextTargetMs = this.elapsedMs + gap;
+      this.nextTargetMs =
+        this.elapsedMs + SPAWN.targetGapMs + Math.random() * SPAWN.targetGapJitterMs;
+    }
+
+    if (this.elapsedMs >= this.nextTracerMs) {
+      batch.tracers.push(this.randomTracer());
+      this.nextTracerMs =
+        this.elapsedMs + SPAWN.tracerGapMs + Math.random() * SPAWN.tracerGapJitterMs;
+    }
+
+    if (this.elapsedMs >= this.nextBalloonMs) {
+      batch.balloons.push(this.randomBalloon());
+      this.nextBalloonMs =
+        this.elapsedMs + SPAWN.balloonGapMs + Math.random() * SPAWN.balloonGapJitterMs;
+    }
+
+    if (this.elapsedMs >= this.nextSearchlightMs) {
+      batch.searchlights.push(this.randomSearchlight());
+      this.nextSearchlightMs =
+        this.elapsedMs + SPAWN.searchlightGapMs + Math.random() * SPAWN.searchlightGapJitterMs;
     }
 
     return batch;
+  }
+
+  private randomTracer(): TracerRequest {
+    const ox = WORLD.width * (0.2 + Math.random() * 0.6);
+    const center = (Math.random() * 2 - 1) * 22 * DEG;
+    const half = (TRACER.sweepDeg * DEG) / 2;
+    // Sweep in a random direction.
+    return Math.random() < 0.5
+      ? { ox, a0: center - half, a1: center + half }
+      : { ox, a0: center + half, a1: center - half };
+  }
+
+  private randomBalloon(): BalloonRequest {
+    const pad = BALLOON.edgePad;
+    const x = pad + Math.random() * (WORLD.width - pad * 2);
+    return { x, y: -BALLOON.radius * 2 };
+  }
+
+  private randomSearchlight(): SearchlightRequest {
+    const ox = WORLD.width * (0.2 + Math.random() * 0.6);
+    const baseAngle = (Math.random() * 2 - 1) * 10 * DEG;
+    return { ox, baseAngle };
   }
 
   private randomTarget(): TargetRequest {

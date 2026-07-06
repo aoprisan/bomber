@@ -16,7 +16,7 @@ Milestones:
 1. ✅ Scaffold + moving bomber with drag input
 2. ✅ Scrolling ground, flak bursts w/ telegraphs, HP/damage, game over
 3. ✅ Targets + bombsight auto-bombing + combo scoring
-4. Tracers, searchlights + fighters, balloons
+4. ✅ Tracers, searchlights + night fighters, barrage balloons
 5. Upgrade system + roguelite segments
 6. Audio, particles, polish, difficulty curve
 

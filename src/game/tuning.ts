@@ -158,6 +158,106 @@ export const SPAWN = {
   targetGapJitterMs: 900,
   /** Object-pool capacity for live targets. */
   maxTargets: 24,
+
+  /**
+   * M4 threats are introduced gradually for a natural early difficulty curve:
+   * flak + targets from the start, then tracers, balloons, and finally
+   * searchlights. Each has its own jittered cadence.
+   */
+  tracerStartDelayMs: 12_000,
+  tracerGapMs: 5200,
+  tracerGapJitterMs: 2600,
+  maxTracers: 10,
+
+  balloonStartDelayMs: 20_000,
+  balloonGapMs: 4200,
+  balloonGapJitterMs: 2400,
+  maxBalloons: 16,
+
+  searchlightStartDelayMs: 30_000,
+  searchlightGapMs: 9000,
+  searchlightGapJitterMs: 4000,
+  maxSearchlights: 3,
+  maxFighters: 8,
+} as const;
+
+// ---------------------------------------------------------------------------
+// M4 — tracers, searchlights + night fighters, barrage balloons
+// ---------------------------------------------------------------------------
+
+/**
+ * Tracer stream — a ground AA gun whose line-of-fire sweeps across the field.
+ * Telegraph: a dim aiming line at the start angle; then the beam goes hot and
+ * sweeps, raking a moving lane you dodge by timing your lateral position.
+ */
+export const TRACER = {
+  aimMs: 850,
+  fireMs: 1300,
+  fadeMs: 300,
+  /** Total sweep arc, degrees (measured at the ground gun). */
+  sweepDeg: 52,
+  /** Hit distance from the beam centerline (world units). */
+  beamHalfWidth: 11,
+  damage: 1,
+  colorAim: "rgba(255,110,70,0.28)",
+  colorHot: "#ff5a3c",
+  tracer: "#ffe08a",
+} as const;
+
+/**
+ * Searchlight cone — sweeps slowly; being caught inside it long enough
+ * (catchMs > 0.7s) summons a night fighter. The cone itself is harmless.
+ */
+export const SEARCHLIGHT = {
+  /** How long a searchlight patrol lasts before leaving (ms). */
+  lifeMs: 6500,
+  /** Peak sweep angle off vertical (degrees). */
+  sweepDeg: 18,
+  /** Full back-and-forth sweep period (ms). Slow enough that lingering in the
+   *  cone accrues the > 0.7s exposure needed to lock (not just at the edges). */
+  sweepPeriodMs: 4200,
+  /** Cone half-angle (degrees). */
+  halfAngleDeg: 12,
+  /** Exposure needed to trigger a fighter (ms). Spec: > 0.7s. */
+  catchMs: 720,
+  /** After summoning a fighter, wait this long before it can again (ms). */
+  cooldownMs: 2200,
+  /** Exposure bleeds off at this multiple of real time when outside. */
+  decayRate: 1.5,
+  beam: "255,244,190",
+} as const;
+
+/**
+ * Night fighter — summoned by a searchlight lock. Telegraphs a vertical
+ * strafing lane (near where you were caught), then dives down it firing.
+ * Dodge by sliding off the lane. Has 1 HP so a tail gunner (M5) can kill it.
+ */
+export const FIGHTER = {
+  telegraphMs: 850,
+  strafeMs: 1000,
+  fadeMs: 250,
+  /** Hit distance from the strafe lane centerline (world units). */
+  laneHalfWidth: 15,
+  damage: 1,
+  hp: 1,
+  body: "#c3cade",
+  tracer: "#ff5a3c",
+} as const;
+
+/**
+ * Barrage balloon — a static obstacle that scrolls down with a taut cable to
+ * the ground. Both the balloon and its cable occupy an x-lane you must not be
+ * in as they pass, forcing lane choices.
+ */
+export const BALLOON = {
+  radius: 17,
+  /** Cable hit half-width (world units). */
+  cableHalfWidth: 3,
+  damage: 1,
+  body: "#3a4152",
+  bodyLight: "#525b70",
+  cable: "rgba(150,160,185,0.5)",
+  edgePad: 40,
 } as const;
 
 // ---------------------------------------------------------------------------

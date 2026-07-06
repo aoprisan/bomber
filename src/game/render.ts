@@ -1,7 +1,11 @@
 import { Explosion, ScorePopup } from "./effects";
 import { Bomber } from "./entities";
 import { Target } from "./targets";
+import { Balloon } from "./threats/balloon";
+import { Fighter } from "./threats/fighter";
 import { Flak } from "./threats/flak";
+import { Searchlight } from "./threats/searchlight";
+import { Tracer } from "./threats/tracer";
 import { BOMB, GROUND, WORLD } from "./tuning";
 
 /**
@@ -14,6 +18,14 @@ export interface Scene {
   flakCount: number;
   targets: readonly Target[];
   targetCount: number;
+  tracers: readonly Tracer[];
+  tracerCount: number;
+  balloons: readonly Balloon[];
+  balloonCount: number;
+  searchlights: readonly Searchlight[];
+  searchlightCount: number;
+  fighters: readonly Fighter[];
+  fighterCount: number;
   explosions: readonly Explosion[];
   explosionCount: number;
   popups: readonly ScorePopup[];
@@ -95,10 +107,15 @@ export class Renderer {
     this.drawSky();
     this.drawParallax(scene.scrollY);
     this.drawGround(scene.scrollY);
+    // Searchlight cones wash over the ground, beneath objects in the air.
+    for (let i = 0; i < scene.searchlightCount; i++) scene.searchlights[i]!.draw(ctx);
     for (let i = 0; i < scene.targetCount; i++) scene.targets[i]!.draw(ctx);
     if (scene.showReticle) this.drawReticle(scene.bomber, alpha);
+    for (let i = 0; i < scene.balloonCount; i++) scene.balloons[i]!.draw(ctx);
+    for (let i = 0; i < scene.tracerCount; i++) scene.tracers[i]!.draw(ctx);
     for (let i = 0; i < scene.flakCount; i++) scene.flak[i]!.draw(ctx);
     if (scene.bomber.visible) this.drawBomber(scene.bomber, alpha);
+    for (let i = 0; i < scene.fighterCount; i++) scene.fighters[i]!.draw(ctx);
     for (let i = 0; i < scene.explosionCount; i++) scene.explosions[i]!.draw(ctx);
     for (let i = 0; i < scene.popupCount; i++) scene.popups[i]!.draw(ctx);
 
